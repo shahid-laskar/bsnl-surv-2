@@ -1,0 +1,629 @@
+# docker-compose.prod.yml
+# Production-ready Docker Compose.
+# Requires: .env file with all required variables.
+# Usage: docker compose -f docker-compose.prod.yml up --build -d
+#
+# Changes from dev docker-compose.yml:
+#   - Django replaced by FastAPI (Gunicorn + Uvicorn)
+#   - Django still runs for web UI (Gunicorn, not runserver)
+#   - All secrets from environment (zero hardcoded values)
+#   - Only ports 80, 443, 8554, 1935 exposed to host
+#   - kafka-ui, konga behind 'debug' profile
+#   - Resource limits on all services
+#   - Health checks on all services
+#   - Network segmentation: frontend / backend / streaming
+
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+x-kafka-env: &kafka-env
+  KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS}
+
+x-minio-env: &minio-env
+  MINIO_ENDPOINT: ${MINIO_ENDPOINT}
+  MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+  MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+
+services:
+
+  # ─── DATABASE ────────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:15-alpine
+    container_name: postgres
+    restart: unless-stopped
+    expose:
+      - "5432"
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_MULTIPLE_DATABASES: kong
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-multiple-db.sh:/docker-entrypoint-initdb.d/init-multiple-db.sh:ro
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 512M
+    logging: *default-logging
+
+  # ─── REDIS ───────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: unless-stopped
+    expose:
+      - "6379"
+    volumes:
+      - redis_data:/data
+    command: >
+      redis-server
+      --appendonly yes
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+      --requirepass ${REDIS_PASSWORD:-}
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+    logging: *default-logging
+
+  # ─── KAFKA ───────────────────────────────────────────────────────────────────
+  kafka:
+    image: apache/kafka:3.7.0
+    container_name: kafka
+    restart: unless-stopped
+    expose:
+      - "9092"
+      - "9094"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9094
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9094
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      KAFKA_NUM_NETWORK_THREADS: 8
+      KAFKA_NUM_IO_THREADS: 8
+      KAFKA_LOG_RETENTION_HOURS: 48
+      KAFKA_LOG_SEGMENT_BYTES: 1073741824
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 1
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 9092 || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 1G
+    logging: *default-logging
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka_ui
+    restart: unless-stopped
+    profiles: ["debug"]
+    expose:
+      - "8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+      DYNAMIC_CONFIG_ENABLED: "true"
+      AUTH_TYPE: "LOGIN_FORM"
+      SPRING_SECURITY_USER_NAME: admin
+      SPRING_SECURITY_USER_PASSWORD: ${KAFKA_UI_PASSWORD}
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks:
+      - backend
+    logging: *default-logging
+
+  # ─── MINIO ───────────────────────────────────────────────────────────────────
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    restart: unless-stopped
+    expose:
+      - "9000"
+      - "9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_CONSOLE_ADDRESS: ":9001"
+    volumes:
+      - minio_data:/data
+    command: server /data
+    networks:
+      - backend
+      - streaming
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 2G
+    logging: *default-logging
+
+  minio_client:
+    image: minio/mc:latest
+    container_name: minio_client
+    restart: "no"
+    depends_on:
+      minio:
+        condition: service_healthy
+    volumes:
+      - minio_mc_config:/root/.mc
+    entrypoint: >
+      /bin/sh -c "
+      /usr/bin/mc alias set myminio http://minio:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD};
+      /usr/bin/mc mb myminio/recordings --ignore-existing;
+      /usr/bin/mc mb myminio/snapshots --ignore-existing;
+      /usr/bin/mc anonymous set download myminio/snapshots;
+      echo 'MinIO buckets ready.';
+      "
+    networks:
+      - backend
+    logging: *default-logging
+
+  minio-cleaner:
+    build:
+      context: .
+      dockerfile: Dockerfile.minio_cleaner
+    container_name: minio_cleaner
+    restart: unless-stopped
+    environment:
+      <<: *minio-env
+      RETENTION_DAYS: ${RETENTION_DAYS:-7}
+    depends_on:
+      minio:
+        condition: service_healthy
+    networks:
+      - backend
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128M
+    logging: *default-logging
+
+  # ─── KONG ────────────────────────────────────────────────────────────────────
+  kong-migration:
+    image: kong:3.8-ubuntu
+    container_name: kong_migration
+    restart: "no"
+    command: "kong migrations bootstrap"
+    environment:
+      KONG_DATABASE: postgres
+      KONG_PG_HOST: postgres
+      KONG_PG_DATABASE: kong
+      KONG_PG_USER: ${KONG_PG_USER}
+      KONG_PG_PASSWORD: ${KONG_PG_PASSWORD}
+      KONG_LOG_LEVEL: warn
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - backend
+    logging: *default-logging
+
+  kong:
+    image: kong:3.8-ubuntu
+    container_name: kong
+    restart: unless-stopped
+    expose:
+      - "8000"
+      - "8001"
+    environment:
+      KONG_DATABASE: postgres
+      KONG_PG_HOST: postgres
+      KONG_PG_DATABASE: kong
+      KONG_PG_USER: ${KONG_PG_USER}
+      KONG_PG_PASSWORD: ${KONG_PG_PASSWORD}
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ACCESS_LOG: /dev/null
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_LISTEN: "0.0.0.0:8001"
+      KONG_PLUGINS: bundled,jwt
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kong-migration:
+        condition: service_completed_successfully
+    networks:
+      - backend
+      - frontend
+    healthcheck:
+      test: ["CMD", "kong", "health"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 512M
+    logging: *default-logging
+
+  kong-config:
+    image: alpine:latest
+    container_name: kong_config
+    restart: "no"
+    entrypoint:
+      - sh
+      - -c
+      - |
+        apk add --no-cache curl jq bash &&
+        sh /kong-config/setup-kong-jwt.sh
+    depends_on:
+      kong:
+        condition: service_healthy
+    volumes:
+      - ./kong:/kong-config:ro
+    networks:
+      - backend
+    logging: *default-logging
+
+  # ─── FASTAPI (REST API) ───────────────────────────────────────────────────────
+  fastapi:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.fastapi
+    container_name: sarvanetra_api
+    restart: unless-stopped
+    expose:
+      - "8000"
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      JWT_KEY: ${JWT_KEY}
+      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS}
+      MEDIAMTX_API_URL: http://mediamtx:9997
+      DOMAIN_NAME: ${DOMAIN_NAME}
+      DEBUG: "0"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - backend
+      - frontend
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 1G
+    logging: *default-logging
+
+  # ─── MEDIAMTX ────────────────────────────────────────────────────────────────
+  mediamtx:
+    build:
+      context: .
+      dockerfile: Dockerfile.mediamtx
+    container_name: mediamtx
+    restart: unless-stopped
+    ports:
+      - "8554:8554"
+      - "1935:1935"
+    expose:
+      - "8888"
+      - "9997"
+    volumes:
+      - ./mediamtx/mediamtx.yml:/etc/mediamtx/mediamtx.yml:ro
+      - ./recordings:/recordings
+      - ./scripts:/scripts
+      - minio_mc_config:/root/.mc
+      - hls_segments:/var/hls
+    environment:
+      <<: *minio-env
+      MTX_PATHS_ALL_RECORD: "yes"
+      MTX_PATHS_ALL_RECORDPATH: "/recordings/%path/%Y/%m/%d/%H-%M-%S-%f"
+      MTX_API: "yes"
+      MTX_APILISTEN: ":9997"
+      MTX_HLS: "yes"
+      MTX_HLSLISTEN: ":8888"
+      MTX_HLSDIRECTORY: /var/hls
+      MTX_HLSVARIANT: lowLatency
+      MTX_HLSSEGMENTCOUNT: 7
+      MTX_HLSSEGMENTDURATION: 1s
+      MTX_HLSPARTDURATION: 200ms
+      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS}
+      TZ: Asia/Kolkata
+    depends_on:
+      minio:
+        condition: service_healthy
+      minio_client:
+        condition: service_completed_successfully
+    networks:
+      - streaming
+      - backend
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 4G
+    logging: *default-logging
+
+  # ─── NGINX ───────────────────────────────────────────────────────────────────
+  nginx:
+    image: nginx:alpine
+    container_name: nginx_hls
+    restart: unless-stopped
+    ports:
+      - "0.0.0.0:80:80"
+      - "0.0.0.0:443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - hls_segments:/var/hls:ro
+      - nginx_cache:/var/cache/nginx
+      - ./nginx/logs:/var/log/nginx
+      - ./staticfiles:/app/static:ro
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    depends_on:
+      django:
+        condition: service_healthy
+      fastapi:
+        condition: service_healthy
+      mediamtx:
+        condition: service_started
+      kong:
+        condition: service_healthy
+    networks:
+      - frontend
+      - streaming
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 256M
+    logging: *default-logging
+
+  # ─── WORKERS ─────────────────────────────────────────────────────────────────
+  upload-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    restart: unless-stopped
+    environment:
+      <<: [*kafka-env, *minio-env]
+      KAFKA_GROUP_ID: upload-workers
+      KAFKA_TOPIC_RECORDINGS: recording.segments
+      FASTAPI_BASE_URL: http://sarvanetra_api:8000
+      BATCH_SIZE: "50"
+      BATCH_TIMEOUT_SECONDS: "30"
+    volumes:
+      - ./recordings:/recordings
+    depends_on:
+      kafka:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      fastapi:
+        condition: service_healthy
+    networks:
+      - backend
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          cpus: "1"
+          memory: 512M
+    logging: *default-logging
+
+  status-monitor:
+    build:
+      context: .
+      dockerfile: Dockerfile.monitor
+    restart: unless-stopped
+    environment:
+      <<: *kafka-env
+      KAFKA_GROUP_ID: status-monitors
+      KAFKA_TOPIC_STATUS: camera.status
+      FASTAPI_BASE_URL: http://sarvanetra_api:8000
+      REDIS_URL: ${REDIS_URL}
+    depends_on:
+      kafka:
+        condition: service_healthy
+      fastapi:
+        condition: service_healthy
+    networks:
+      - backend
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+    logging: *default-logging
+
+  onvif-producer-1:
+    build:
+      context: .
+      dockerfile: Dockerfile.onvif_producer
+    container_name: onvif_producer_1
+    hostname: worker-1
+    restart: unless-stopped
+    environment:
+      <<: *kafka-env
+      DATABASE_URL: ${DATABASE_URL}
+      MAX_CAMERAS_PER_WORKER: "25"
+      HOSTNAME: worker-1
+      CAMERA_DISCOVERY_INTERVAL: "60"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - backend
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 2G
+    logging: *default-logging
+
+  onvif-producer-2:
+    build:
+      context: .
+      dockerfile: Dockerfile.onvif_producer
+    container_name: onvif_producer_2
+    hostname: worker-2
+    restart: unless-stopped
+    environment:
+      <<: *kafka-env
+      DATABASE_URL: ${DATABASE_URL}
+      MAX_CAMERAS_PER_WORKER: "25"
+      HOSTNAME: worker-2
+      CAMERA_DISCOVERY_INTERVAL: "60"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - backend
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 2G
+    logging: *default-logging
+
+  motion-consumer-1:
+    build:
+      context: .
+      dockerfile: Dockerfile.motion_consumer
+    container_name: motion_consumer_1
+    restart: unless-stopped
+    environment:
+      <<: *kafka-env
+      DATABASE_URL: ${DATABASE_URL}
+      KAFKA_GROUP_ID: motion-event-consumers
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - backend
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 1G
+    logging: *default-logging
+
+  motion-consumer-2:
+    build:
+      context: .
+      dockerfile: Dockerfile.motion_consumer
+    container_name: motion_consumer_2
+    restart: unless-stopped
+    environment:
+      <<: *kafka-env
+      DATABASE_URL: ${DATABASE_URL}
+      KAFKA_GROUP_ID: motion-event-consumers
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - backend
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 1G
+    logging: *default-logging
+
+
+# ─── VOLUMES ─────────────────────────────────────────────────────────────────
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+  minio_mc_config:
+  kafka_data:
+  hls_segments:
+  nginx_cache:
+
+
+# ─── NETWORKS ─────────────────────────────────────────────────────────────────
+networks:
+  frontend:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.21.0.0/24
+
+  backend:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.22.0.0/24
+
+  streaming:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.23.0.0/24

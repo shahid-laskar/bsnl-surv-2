@@ -1,0 +1,101 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+
+[project]
+name = "sarvanetra-backend"
+version = "1.0.0"
+description = "Sarvanetra Surveillance Platform — FastAPI Backend"
+requires-python = ">=3.12"
+dependencies = [
+    # Core
+    "fastapi==0.115.5",
+    "uvicorn[standard]==0.32.1",
+    "gunicorn==23.0.0",
+    # Data validation
+    "pydantic==2.9.2",
+    "pydantic-settings==2.6.1",
+    # Database
+    "sqlalchemy==2.0.36",
+    "asyncpg==0.30.0",
+    "alembic==1.14.0",
+    # Cache
+    "redis[hiredis]==5.2.0",
+    # Kafka
+    "aiokafka==0.11.0",
+    # Storage
+    "minio==7.2.9",
+    # Auth / JWT
+    "python-jose[cryptography]==3.3.0",
+    "passlib[bcrypt]==1.7.4",
+    "email-validator>=2.0.0",
+    # HTTP client
+    "httpx==0.27.2",
+    # Retry
+    "tenacity==9.0.0",
+    # Logging
+    "structlog==24.4.0",
+    # ONVIF
+    "onvif-zeep==0.2.12",
+    # Push notifications
+    "google-auth==2.35.0",
+    # Utilities
+    "python-multipart==0.0.12",  # For form data
+    "python-dotenv==1.0.1",
+    "pytz==2024.2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==8.3.3",
+    "pytest-asyncio==0.24.0",
+    "pytest-cov==6.0.0",
+    "httpx",                # Test client for FastAPI
+    "coverage==7.6.4",
+    "ruff==0.7.4",
+    "mypy==1.13.0",
+    "types-passlib",
+    "types-pytz",
+    "factory-boy==3.3.1",
+    "respx==0.21.1",        # Mock httpx in tests
+]
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.6.0",
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "TCH", "ANN", "N"]
+ignore = [
+    "ANN101",  # Missing type annotation for self
+    "ANN102",  # Missing type annotation for cls
+    "N806",    # Variable in function should be lowercase (needed for model compat)
+    "N815",    # Mixed-case variable in class scope (BSNL naming convention)
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+ignore_missing_imports = true
+plugins = ["pydantic.mypy", "sqlalchemy.ext.mypy.plugin"]
+
+[tool.coverage.run]
+source = ["app"]
+omit = ["tests/*", "alembic/*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]

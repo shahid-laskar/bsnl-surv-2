@@ -1,0 +1,64 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --radius: 0.5rem;
+    --font-inter: "Inter", system-ui, sans-serif;
+  }
+
+  /* Scrollbar styling for dark theme */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #2a3347 transparent;
+  }
+
+  *::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background-color: #2a3347;
+    border-radius: 3px;
+  }
+
+  /* Focus ring — visible for keyboard nav */
+  :focus-visible {
+    outline: 2px solid theme("colors.brand.500");
+    outline-offset: 2px;
+  }
+
+  /* Remove default button outline */
+  button:focus:not(:focus-visible) {
+    outline: none;
+  }
+
+  /* Selection colour */
+  ::selection {
+    background-color: theme("colors.brand.700");
+    color: white;
+  }
+}
+
+@layer utilities {
+  /* Truncate with title tooltip shorthand */
+  .truncate-title {
+    @apply truncate;
+  }
+}
+
+/* Video element — remove default outline */
+video {
+  outline: none;
+}
+
+/* HLS.js video — fill container */
+video.hls-video {
+  @apply h-full w-full object-cover;
+}
