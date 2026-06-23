@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     # ── Application ──────────────────────────────────────────────────────────
     app_name: str = "Sarvanetra"
     app_version: str = "1.0.0"
-    debug: bool = False
+    debug: bool = True
 
     # ── Database ─────────────────────────────────────────────────────────────
     database_url: str  # postgresql+asyncpg://user:pass@host:5432/db

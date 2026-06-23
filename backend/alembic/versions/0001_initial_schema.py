@@ -316,6 +316,7 @@ def upgrade() -> None:
             "timestamp", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False
         ),
         sa.Column("duration", sa.Interval(), nullable=True),
+        sa.Column("acknowledged", sa.Boolean(), nullable=False, server_default="false"),
         sa.Column("camera_id", sa.Integer(), nullable=False),
         sa.ForeignKeyConstraint(["camera_id"], ["sv_camera_master.id"]),
         sa.PrimaryKeyConstraint("id"),

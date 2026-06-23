@@ -32,6 +32,7 @@ from app.core.middleware import (
     register_exception_handlers,
 )
 from app.core.redis import close_redis, redis_client
+from app.services.kafka_service import KafkaProducerService
 
 logger = structlog.get_logger(__name__)
 
@@ -61,10 +62,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         logger.error("app.redis_unreachable", error=str(exc))
         raise
 
+    producer = KafkaProducerService()
+    await producer.start()
+
     yield  # ── Application is running ──
 
     # Shutdown: close connection pools
     logger.info("app.shutdown")
+    await producer.stop()
     await engine.dispose()
     await close_redis()
     logger.info("app.shutdown_complete")
@@ -98,6 +103,9 @@ def create_app() -> FastAPI:
 
     # ── Routers ───────────────────────────────────────────────────────────────
     app.include_router(v1_router)
+
+    from app.api.v1.internal import router as internal_router
+    app.include_router(internal_router)
 
     # ── Exception handlers ────────────────────────────────────────────────────
     register_exception_handlers(app)

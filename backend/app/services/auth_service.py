@@ -47,7 +47,18 @@ class AuthService:
         # Get Kong consumer to build the correct iss claim
         kong_consumer = await self._get_kong_consumer(user.id)
         if not kong_consumer:
-            raise UnauthorizedError("User has no Kong credential — contact admin")
+            if user.is_superuser or user.role == "sysadmin":
+                # Auto-provision Kong consumer for seeded admin
+                consumer_username, jwt_key = await self._kong.create_consumer_and_credential(user.id)
+                kong_consumer = SvKongConsumer(
+                    user_id=user.id,
+                    kong_consumer_username=consumer_username,
+                    jwt_key=jwt_key,
+                    is_active=True,
+                )
+                self._db.add(kong_consumer)
+            else:
+                raise UnauthorizedError("User has no Kong credential — contact admin")
 
         # Build access token
         access_token = create_access_token(

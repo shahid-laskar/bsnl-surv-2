@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, ForeignKey, Index, Interval, String
+from sqlalchemy import DateTime, ForeignKey, Index, Interval, String, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
@@ -39,6 +39,7 @@ class CameraStatusLog(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
     duration: Mapped[timedelta | None] = mapped_column(Interval, nullable=True)
+    acknowledged: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
 
     # FK
     camera_id: Mapped[int] = mapped_column(ForeignKey("sv_camera_master.id"), nullable=False)

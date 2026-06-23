@@ -309,8 +309,9 @@ services:
       JWT_KEY: ${JWT_KEY}
       KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS}
       MEDIAMTX_API_URL: http://mediamtx:9997
+      KONG_ADMIN_URL: ${KONG_ADMIN_URL}
       DOMAIN_NAME: ${DOMAIN_NAME}
-      DEBUG: "0"
+      DEBUG: "1"
     depends_on:
       postgres:
         condition: service_healthy
@@ -428,11 +429,12 @@ services:
       context: . 
       dockerfile: frontend/Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: http://localhost
+        NEXT_PUBLIC_API_URL: ""
+        VITE_API_URL: ""
     container_name: sarvanetra_frontend
     restart: unless-stopped
     environment:
-      VITE_API_URL: http://localhost      
+      VITE_API_URL: ""
     expose:
       - "3000"
     depends_on:

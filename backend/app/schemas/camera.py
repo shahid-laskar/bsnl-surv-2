@@ -113,4 +113,4 @@ class StreamTokenResponse(BaseModel):
     cam_id: str
     stream_url: str
     token: str
-    expires_in: int  # seconds
+    expires_at: datetime  # Absolute expiry timestamp (UTC)
