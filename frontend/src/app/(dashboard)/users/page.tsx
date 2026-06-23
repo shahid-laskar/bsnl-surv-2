@@ -86,7 +86,7 @@ export default function UsersPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-gray-400 text-xs">
-                      {user.com_name ?? "—"}
+                      {user.com_id ?? "—"}
                     </td>
                     <td className="px-4 py-3 text-gray-500 text-xs">
                       {formatDate(user.date_joined)}

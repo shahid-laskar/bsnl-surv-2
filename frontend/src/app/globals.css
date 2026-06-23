@@ -30,7 +30,7 @@
 
   /* Focus ring — visible for keyboard nav */
   :focus-visible {
-    outline: 2px solid theme("colors.brand.500");
+    outline: 2px solid #3b82f6;
     outline-offset: 2px;
   }
 
@@ -41,7 +41,7 @@
 
   /* Selection colour */
   ::selection {
-    background-color: theme("colors.brand.700");
+    background-color: #1d4ed8;
     color: white;
   }
 }

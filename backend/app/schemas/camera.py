@@ -1,6 +1,14 @@
 """
 app/schemas/camera.py
 Pydantic V2 schemas for camera_master CRUD.
+
+FIX (see customer/geography delivery notes): CameraResponse / CameraListItem
+previously used Django-style `_id`-suffixed field names (com_id_id, cir_id_id,
+ba_id_id, device_id_id, strm_type_id_id) that don't exist as attributes on
+the SQLAlchemy camera_master model — only `com_id`, `cir_id`, etc. do. With
+`from_attributes=True`, that mismatch made every CameraResponse.model_validate()
+call raise a validation error, breaking GET/POST/PATCH /cameras. Field names
+below now match the model exactly.
 """
 
 from datetime import datetime
@@ -79,11 +87,11 @@ class CameraResponse(BaseModel):
     is_active: bool
     motion_active: bool
     upd_time: datetime
-    com_id_id: int
-    cir_id_id: int
-    ba_id_id: int
-    device_id_id: int
-    strm_type_id_id: int | None
+    com_id: int
+    cir_id: int
+    ba_id: int
+    device_id: int
+    strm_type_id: int | None
 
 
 class CameraListItem(BaseModel):
@@ -96,7 +104,7 @@ class CameraListItem(BaseModel):
     cam_loc: str
     is_active: bool
     motion_active: bool
-    com_id_id: int
+    com_id: int
 
 
 class StreamTokenResponse(BaseModel):

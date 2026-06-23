@@ -125,6 +125,15 @@ class MinIOError(ServiceUnavailableError):
         super().__init__(f"MinIO error: {detail}")
 
 
+class FFmpegError(ServiceUnavailableError):
+    """Raised when an ffmpeg subprocess (e.g. segment merge) fails or is missing."""
+
+    error_code = "FFMPEG_ERROR"
+
+    def __init__(self, detail: str) -> None:
+        super().__init__(f"FFmpeg error: {detail}")
+
+
 class CamIDGenerationError(UnprocessableError):
     error_code = "CAM_ID_GENERATION_FAILED"
 

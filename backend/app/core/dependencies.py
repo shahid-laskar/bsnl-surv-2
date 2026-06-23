@@ -109,3 +109,19 @@ def get_scoped_com_id(current_user: SvUser = Depends(get_current_user)) -> int |
     if current_user.role in ("sysadmin", "circle_admin", "ba_admin"):
         return None
     return current_user.com_id
+
+
+def assert_company_access(user: SvUser, com_id: int) -> None:
+    """
+    Raise ForbiddenError if `user` cannot access a resource scoped to `com_id`.
+
+    sysadmin / circle_admin / ba_admin pass through here — any further
+    narrowing (e.g. "only this circle's customers") happens at the query
+    level in the relevant service, same pattern as cameras.py's
+    `_assert_customer_access`. cust_admin / viewer are hard-restricted to
+    their own company.
+    """
+    if user.role in ("sysadmin", "circle_admin", "ba_admin"):
+        return
+    if user.com_id != com_id:
+        raise ForbiddenError(f"Access to company {com_id} is not permitted for your account")

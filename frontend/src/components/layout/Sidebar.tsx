@@ -15,7 +15,7 @@ import {
   Settings,
   ShieldCheck,
 } from "lucide-react";
-import { cn, hasRole } from "@/lib/utils";
+import { cn, hasRole, getRoleLabel } from "@/lib/utils";
 import type { UserRole } from "@/types/api";
 
 interface NavItem {

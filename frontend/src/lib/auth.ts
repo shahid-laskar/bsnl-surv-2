@@ -1,52 +1,47 @@
-// src/lib/auth.ts
-// NextAuth v5 configuration.
-// Uses Credentials provider against our FastAPI /api/v1/auth/login endpoint.
-// Stores JWT token in the session for use by the API client.
 
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
-import type { UserRole } from "@/types/api";
+import type { UserRole, LoginResponse, TokenRefreshResponse } from "@/types/api";
 
-// Extend NextAuth types to carry our custom fields
-declare module "next-auth" {
-  interface Session {
-    accessToken: string;
-    user: {
-      id: number;
-      name: string;
-      email: string;
-      role: UserRole;
-      com_id: number | null;
-      com_name: string | null;
-      cir_id: number | null;
-      ba_id: number | null;
+// Server-side fetches use the internal Docker network URL when available.
+// Client-side fetches always use NEXT_PUBLIC_API_URL.
+const API_URL =
+  process.env.API_INTERNAL_URL ??
+  process.env.NEXT_PUBLIC_API_URL ??
+  "http://localhost:8000";
+
+// Refresh when fewer than this many seconds remain on the access token.
+const REFRESH_BUFFER_SECONDS = 300; // 5 minutes
+
+// ── Token refresh helper ──────────────────────────────────────────────────────
+
+async function refreshAccessToken(refreshToken: string): Promise<{
+  accessToken: string;
+  refreshToken: string;
+  accessTokenExpiresAt: number;
+} | null> {
+  try {
+    const res = await fetch(`${API_URL}/api/v1/auth/refresh`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    });
+
+    if (!res.ok) return null;
+
+    const data = (await res.json()) as TokenRefreshResponse;
+
+    return {
+      accessToken: data.access_token,
+      refreshToken: data.refresh_token,           // Rotated — store the new one
+      accessTokenExpiresAt: Math.floor(Date.now() / 1000) + data.expires_in,
     };
-  }
-
-  interface User {
-    id: number;
-    accessToken: string;
-    role: UserRole;
-    com_id: number | null;
-    com_name: string | null;
-    cir_id: number | null;
-    ba_id: number | null;
+  } catch {
+    return null;
   }
 }
 
-declare module "next-auth/jwt" {
-  interface JWT {
-    accessToken: string;
-    role: UserRole;
-    userId: number;
-    com_id: number | null;
-    com_name: string | null;
-    cir_id: number | null;
-    ba_id: number | null;
-  }
-}
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+// ── NextAuth config ───────────────────────────────────────────────────────────
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
@@ -60,7 +55,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         if (!credentials?.username || !credentials?.password) return null;
 
         try {
-          const response = await fetch(`${API_URL}/api/v1/auth/login`, {
+          const res = await fetch(`${API_URL}/api/v1/auth/login`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -69,32 +64,24 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             }),
           });
 
-          if (!response.ok) return null;
+          if (!res.ok) return null;
 
-          const data = (await response.json()) as {
-            access_token: string;
-            user: {
-              id: number;
-              username: string;
-              first_name: string;
-              last_name: string;
-              email: string;
-              role: UserRole;
-              com_id: number | null;
-              com_name: string | null;
-              cir_id: number | null;
-              ba_id: number | null;
-            };
-          };
+          const data = (await res.json()) as LoginResponse;
 
           return {
-            id: data.user.id,
-            name: `${data.user.first_name} ${data.user.last_name}`.trim() || data.user.username,
+            // NextAuth requires id to be string
+            id: String(data.user.id),
+            name:
+              `${data.user.first_name} ${data.user.last_name}`.trim() ||
+              data.user.username,
             email: data.user.email,
+            // Custom fields (declared in src/types/next-auth.d.ts)
             accessToken: data.access_token,
+            refreshToken: data.refresh_token,
+            accessTokenExpiresAt:
+              Math.floor(Date.now() / 1000) + data.expires_in,
             role: data.user.role,
             com_id: data.user.com_id,
-            com_name: data.user.com_name,
             cir_id: data.user.cir_id,
             ba_id: data.user.ba_id,
           };
@@ -112,33 +99,61 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
   session: {
     strategy: "jwt",
-    maxAge: 60 * 60 * 8, // 8 hours
+    // Must be >= refresh token lifetime (30 days per backend config)
+    maxAge: 60 * 60 * 24 * 30,
   },
 
   callbacks: {
     async jwt({ token, user }) {
-      // On initial sign-in, persist user fields into the JWT
+      // ── Initial sign-in: populate JWT from the User object ────────────────
       if (user) {
         token.accessToken = user.accessToken;
+        token.refreshToken = user.refreshToken;
+        token.accessTokenExpiresAt = user.accessTokenExpiresAt;
         token.role = user.role;
-        token.userId = user.id;
+        token.userId = Number(user.id);   // Convert string → number for our use
         token.com_id = user.com_id;
-        token.com_name = user.com_name;
         token.cir_id = user.cir_id;
         token.ba_id = user.ba_id;
+        return token;
       }
-      return token;
+
+      // ── Subsequent requests: refresh access token if nearing expiry ───────
+      const nowSeconds = Math.floor(Date.now() / 1000);
+      const secondsRemaining = token.accessTokenExpiresAt - nowSeconds;
+
+      if (secondsRemaining > REFRESH_BUFFER_SECONDS) {
+        // Still valid — return unchanged
+        return token;
+      }
+
+      // Attempt rotation
+      const refreshed = await refreshAccessToken(token.refreshToken);
+
+      if (!refreshed) {
+        // Signal the session layer so the UI can show a re-login prompt
+        return { ...token, error: "RefreshFailed" as const };
+      }
+
+      return {
+        ...token,
+        accessToken: refreshed.accessToken,
+        refreshToken: refreshed.refreshToken,
+        accessTokenExpiresAt: refreshed.accessTokenExpiresAt,
+        error: undefined,
+      };
     },
 
     async session({ session, token }) {
-      // Expose token fields on the session object
       session.accessToken = token.accessToken;
-      session.user.id = token.userId;
+      session.refreshToken = token.refreshToken;
+      session.accessTokenExpiresAt = token.accessTokenExpiresAt;      
+      (session.user as any).id = Number(token.userId);
       session.user.role = token.role;
       session.user.com_id = token.com_id;
-      session.user.com_name = token.com_name;
       session.user.cir_id = token.cir_id;
       session.user.ba_id = token.ba_id;
+      if (token.error) session.error = token.error;
       return session;
     },
   },

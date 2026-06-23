@@ -1,9 +1,9 @@
 """
-app/schemas/recording.py + app/services/recording_service.py combined
-Pydantic schemas and business logic for VideoSegment.
+app/schemas/recording.py
+Pydantic schemas for VideoSegment, timeline queries, and multi-segment
+operations (merge / zip download).
 """
 
-# ── app/schemas/recording.py ──────────────────────────────────────────────────
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -77,3 +77,22 @@ class TimelineResponse(BaseModel):
     segment_count: int
     start_date: str
     end_date: str
+
+
+# ── Multi-segment operations ──────────────────────────────────────────────────
+
+
+class MergeSegmentsRequest(BaseModel):
+    """
+    POST /recordings/merge body.
+    Segments are concatenated with ffmpeg stream-copy (no re-encode) in the
+    exact order given — they must all belong to the same camera.
+    """
+
+    segment_ids: list[int] = Field(min_length=2, max_length=100)
+
+
+class DownloadZipRequest(BaseModel):
+    """POST /recordings/download-zip body. Segments may span multiple cameras."""
+
+    segment_ids: list[int] = Field(min_length=1, max_length=200)

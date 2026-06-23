@@ -3,7 +3,7 @@
 
 import { useState } from "react";
 import { signIn } from "next-auth/react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { LoginSchema, type LoginFormValues } from "@/types/schemas";
@@ -12,8 +12,10 @@ import { cn } from "@/lib/utils";
 
 export default function LoginPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get("callbackUrl") ?? "/";
+  const callbackUrl =
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("callbackUrl") ?? "/"
+      : "/";
 
   const [showPassword, setShowPassword] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);

@@ -4,13 +4,15 @@ WORKDIR /app
 
 # Install dependencies first (cache layer)
 COPY package.json package-lock.json* ./
-RUN npm ci --frozen-lockfile
+RUN npm install
 
 # Copy source
 COPY . .
 
 # Build
 ENV NEXT_TELEMETRY_DISABLED=1
+ARG NEXT_PUBLIC_API_URL=http://localhost
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 RUN npm run build
 
 # Production stage
