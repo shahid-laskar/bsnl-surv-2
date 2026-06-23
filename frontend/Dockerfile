@@ -3,41 +3,34 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 # Install dependencies first (cache layer)
-COPY package.json package-lock.json* ./
+COPY frontend/package.json frontend/package-lock.json* ./
 RUN npm install
 
 # Copy source
-COPY . .
+COPY frontend/ .
 
-# Build
-ENV NEXT_TELEMETRY_DISABLED=1
-ARG NEXT_PUBLIC_API_URL=http://localhost
-ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+# Build — Vite outputs to /app/dist
+ARG VITE_API_URL=http://localhost
+ENV VITE_API_URL=$VITE_API_URL
+ARG VITE_WS_URL=ws://localhost
+ENV VITE_WS_URL=$VITE_WS_URL
 RUN npm run build
 
-# Production stage
-FROM node:20-alpine AS runner
-WORKDIR /app
+# Production stage — serve static files with nginx
+FROM nginx:1.27-alpine AS runner
 
-ENV NODE_ENV=production
-ENV NEXT_TELEMETRY_DISABLED=1
+# Remove default nginx config
+RUN rm /etc/nginx/conf.d/default.conf
 
-# Non-root user
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
+# Copy our SPA-friendly nginx config
+COPY infra/nginx/spa.conf /etc/nginx/conf.d/default.conf
 
-# Copy built assets
-COPY --from=builder /app/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+# Copy Vite build output
+COPY --from=builder /app/dist /usr/share/nginx/html
 
-USER nextjs
+EXPOSE 80
 
-EXPOSE 3000
-ENV PORT=3000
-ENV HOSTNAME="0.0.0.0"
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+  CMD wget -qO- http://localhost/index.html || exit 1
 
-HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
-  CMD wget -qO- http://localhost:3000/api/health || exit 1
-
-CMD ["node", "server.js"]
+CMD ["nginx", "-g", "daemon off;"]

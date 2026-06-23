@@ -1,8 +1,6 @@
 // src/components/alerts/AlertList.tsx
-"use client";
-
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { alertApi, getApiErrorMessage } from "@/lib/api";
+import { alertApi } from "@/lib/api";
 import { formatDateTime } from "@/lib/utils";
 import { Camera, CheckCircle, AlertTriangle } from "lucide-react";
 import type { CameraAlert } from "@/types/api";

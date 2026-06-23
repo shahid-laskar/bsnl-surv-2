@@ -1,6 +1,4 @@
 // src/components/layout/AlertSocketProvider.tsx
-"use client";
-
 import { useAlertSocket } from "@/hooks/useAlertSocket";
 
 // This component's only job is to mount the WebSocket hook

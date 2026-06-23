@@ -1,9 +1,6 @@
 // src/components/layout/Sidebar.tsx
-"use client";
-
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { Link, useLocation } from "react-router-dom";
+import { useSession } from "@/contexts/AuthContext";
 import {
   LayoutDashboard,
   Camera,
@@ -77,7 +74,7 @@ const NAV_ITEMS: NavItem[] = [
 ];
 
 export function Sidebar() {
-  const pathname = usePathname();
+  const { pathname } = useLocation();
   const { data: session } = useSession();
   const userRole = session?.user?.role as UserRole | undefined;
 
@@ -111,7 +108,7 @@ export function Sidebar() {
             return (
               <li key={item.href}>
                 <Link
-                  href={item.href}
+                  to={item.href}
                   className={cn(
                     "flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
                     isActive

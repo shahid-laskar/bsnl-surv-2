@@ -12,6 +12,6 @@ MESSAGE="{\"event_type\":\"camera_status\",\"camera\":\"$CAMERA\",\"status\":\"n
 
 echo "$MESSAGE" | kcat -b "${KAFKA_BOOTSTRAP_SERVERS:-kafka:9092}" \
   -t "${KAFKA_TOPIC_STATUS:-camera.status}" \
-  -P > /dev/null 2>&1 
+  -P > /dev/null 2>&1
 
 exit 0

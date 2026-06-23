@@ -17,6 +17,6 @@ MESSAGE="{\"event_type\":\"segment_complete\",\"camera_path\":\"$CAMERA\",\"file
 # Send to Kafka in background (fast, non-blocking)
 echo "$MESSAGE" | kcat -b "${KAFKA_BOOTSTRAP_SERVERS:-kafka:9092}" \
   -t "${KAFKA_TOPIC_SEGMENTS:-recording.segments}" \
-  -P > /dev/null 2>&1 
+  -P > /dev/null 2>&1
 
 exit 0

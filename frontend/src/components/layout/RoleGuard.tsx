@@ -3,9 +3,7 @@
 // API enforces all permissions server-side.
 // Never rely on this guard alone.
 
-"use client";
-
-import { useSession } from "next-auth/react";
+import { useSession } from "@/contexts/AuthContext";
 import type { UserRole } from "@/types/api";
 import { hasRole } from "@/lib/utils";
 

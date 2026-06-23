@@ -2,14 +2,12 @@
 // WebSocket connection to the FastAPI alert feed.
 // Manages connection lifecycle with exponential-backoff reconnect.
 
-"use client";
-
 import { useEffect, useRef } from "react";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/contexts/AuthContext";
 import { useAlertStore } from "@/stores/alertStore";
 import type { CameraAlert } from "@/types/api";
 
-const WS_BASE = process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:8000";
+const WS_BASE = import.meta.env.VITE_WS_URL ?? "ws://localhost:8000";
 const MAX_RECONNECT_DELAY_MS = 30_000;
 
 export function useAlertSocket(): void {

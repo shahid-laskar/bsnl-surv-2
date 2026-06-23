@@ -80,7 +80,7 @@ The plan is designed so Phase 0–2 can be done in the first week and you'll hav
 
 
 Sarvanetra implementation plan
-Document · MD 
+Document · MD
 lets start phase 0
 
 17 Jun
@@ -504,7 +504,7 @@ The frontend will start on http://localhost:3000. It expects the FastAPI backend
 
 
 frontend
- 
+
 Remove django from the project as we are creating a completely fresh project. we need to move django auth to our fastapi backend . Create an md file supplementing the implementation plan to be given to agent
 
 18 Jun
@@ -1117,10 +1117,3 @@ Learn more(opens in new tab)
 
 
 Claude is AI and can make mistakes. Please double-check responses.
-
-
-
-
-
-
-

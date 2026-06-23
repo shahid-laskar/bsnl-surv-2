@@ -35,7 +35,12 @@ BUCKET = os.getenv("DEFAULT_BUCKET", "recordings")
 RETENTION_DAYS = int(os.getenv("RETENTION_DAYS", "7"))
 CHECK_INTERVAL_SECONDS = int(os.getenv("CLEANER_INTERVAL_SECONDS", "3600"))
 
-client = Minio(MINIO_ENDPOINT, access_key=MINIO_ACCESS_KEY, secret_key=MINIO_SECRET_KEY, secure=False)
+client = Minio(
+    MINIO_ENDPOINT,
+    access_key=MINIO_ACCESS_KEY,
+    secret_key=MINIO_SECRET_KEY,
+    secure=False,
+)
 
 
 def run_cleanup() -> None:

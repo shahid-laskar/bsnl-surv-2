@@ -1,7 +1,5 @@
 // src/components/cameras/CameraCard.tsx
-"use client";
-
-import Link from "next/link";
+import { Link } from "react-router-dom";
 import { Camera, MapPin, Video, Activity } from "lucide-react";
 import { CameraStatusBadge } from "./CameraStatusBadge";
 import { timeAgo } from "@/lib/utils";
@@ -14,7 +12,7 @@ interface CameraCardProps {
 export function CameraCard({ camera }: CameraCardProps) {
   return (
     <Link
-      href={`/cameras/${camera.cam_id}`}
+      to={`/cameras/${camera.cam_id}`}
       className="group flex flex-col gap-3 rounded-lg border border-surface-border bg-surface-card p-4 transition-all hover:border-brand-700/50 hover:bg-surface-elevated"
     >
       {/* Header */}

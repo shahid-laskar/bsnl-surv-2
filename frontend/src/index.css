@@ -1,0 +1,114 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-50: #f0f7ff;
+  --color-brand-100: #e0effe;
+  --color-brand-200: #bae0fd;
+  --color-brand-300: #7cc8fc;
+  --color-brand-400: #38aef9;
+  --color-brand-500: #0e95eb;
+  --color-brand-600: #0277cb;
+  --color-brand-700: #035fa3;
+  --color-brand-800: #075185;
+  --color-brand-900: #0c436e;
+  --color-brand-950: #082b49;
+
+  --color-surface: #0a0f1d;
+  --color-surface-card: #121826;
+  --color-surface-elevated: #1e2538;
+  --color-surface-border: #2e394e;
+
+  --color-status-online: #10b981;
+  --color-status-offline: #ef4444;
+  --color-severity-critical: #f43f5e;
+
+  /* Standard shadcn theme mapping */
+  --color-background: #0a0f1d;
+  --color-foreground: #f3f4f6;
+  
+  --color-card: #121826;
+  --color-card-foreground: #f3f4f6;
+  
+  --color-popover: #121826;
+  --color-popover-foreground: #f3f4f6;
+  
+  --color-primary: #f9fafb;
+  --color-primary-foreground: #111827;
+  
+  --color-secondary: #1e293b;
+  --color-secondary-foreground: #f8fafc;
+  
+  --color-muted: #1e293b;
+  --color-muted-foreground: #94a3b8;
+  
+  --color-accent: #334155;
+  --color-accent-foreground: #f8fafc;
+  
+  --color-destructive: #7f1d1d;
+  --color-destructive-foreground: #fef2f2;
+  
+  --color-border: #1e293b;
+  --color-input: #1e293b;
+  --color-ring: #cbd5e1;
+}
+
+@layer base {
+  :root {
+    --radius: 0.5rem;
+    --font-inter: "Inter", system-ui, sans-serif;
+  }
+
+  /* Scrollbar styling for dark theme */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #2a3347 transparent;
+  }
+
+  *::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background-color: #2a3347;
+    border-radius: 3px;
+  }
+
+  /* Focus ring — visible for keyboard nav */
+  :focus-visible {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+  }
+
+  /* Remove default button outline */
+  button:focus:not(:focus-visible) {
+    outline: none;
+  }
+
+  /* Selection colour */
+  ::selection {
+    background-color: #1d4ed8;
+    color: white;
+  }
+}
+
+@layer utilities {
+  /* Truncate with title tooltip shorthand */
+  .truncate-title {
+    @apply truncate;
+  }
+}
+
+/* Video element — remove default outline */
+video {
+  outline: none;
+}
+
+/* HLS.js video — fill container */
+video.hls-video {
+  @apply h-full w-full object-cover;
+}

@@ -40,7 +40,9 @@ async def create_circle(
     body: CircleCreateRequest,
     db: AsyncSession = Depends(get_db),
 ) -> CircleResponse:
-    existing = await db.execute(select(circle_master).where(circle_master.cir_code == body.cir_code))
+    existing = await db.execute(
+        select(circle_master).where(circle_master.cir_code == body.cir_code)
+    )
     if existing.scalar_one_or_none() is not None:
         raise ConflictError(f"Circle code '{body.cir_code}' already exists")
 

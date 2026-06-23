@@ -26,4 +26,3 @@ if mc cp "$FILE_PATH" "myminio/recordings/$CAMERA_NAME/$FILENAME"; then
 else
     echo "[$(date)] Upload failed: $FILENAME" >> $LOG_FILE
 fi
-

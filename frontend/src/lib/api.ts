@@ -7,7 +7,6 @@ import axios, {
   type AxiosInstance,
   type InternalAxiosRequestConfig,
 } from "axios";
-import { getSession, signOut } from "next-auth/react";
 import type {
   AppUser,
   Camera,
@@ -40,31 +39,40 @@ import type {
 // ── Axios instance ────────────────────────────────────────────────────────────
 
 const api: AxiosInstance = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000",
+  baseURL: import.meta.env.VITE_API_URL ?? "http://localhost:8000",
   timeout: 30_000,
   headers: {
     "Content-Type": "application/json",
   },
 });
 
-// Attach JWT from NextAuth session on every request
+// Attach JWT from localStorage on every request.
+// Reads directly from storage so we don't need a React context reference here.
 api.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
   // Skip auth header for login endpoint
   if (config.url?.includes("/auth/login")) return config;
 
-  const session = await getSession();
-  if (session?.accessToken) {
-    config.headers.Authorization = `Bearer ${session.accessToken}`;
+  try {
+    const raw = localStorage.getItem("sarvanetra_session");
+    if (raw) {
+      const session = JSON.parse(raw) as { accessToken?: string };
+      if (session.accessToken) {
+        config.headers.Authorization = `Bearer ${session.accessToken}`;
+      }
+    }
+  } catch {
+    // Ignore
   }
   return config;
 });
 
-// Handle 401 globally — sign out and redirect to login
+// Handle 401 globally — clear localStorage and redirect to /login
 api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
     if (error.response?.status === 401) {
-      await signOut({ callbackUrl: "/login" });
+      localStorage.removeItem("sarvanetra_session");
+      window.location.href = "/login";
     }
     return Promise.reject(error);
   },
@@ -161,7 +169,7 @@ export const cameraApi = {
 
   // Returns JPEG snapshot URL
   getSnapshotUrl: (camId: string) =>
-    `${process.env.NEXT_PUBLIC_API_URL}/api/v1/cameras/${camId}/snapshot`,
+    `${import.meta.env.VITE_API_URL ?? ""}/api/v1/cameras/${camId}/snapshot`,
 };
 
 // ── Devices ───────────────────────────────────────────────────────────────────

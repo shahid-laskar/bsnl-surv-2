@@ -4,36 +4,26 @@
 //   - Removed com_name display (not in new sv_users schema)
 //   - Added session error banner when token refresh fails
 //   - Logout now calls POST /api/v1/auth/logout to revoke refresh token
+//   - Replaced next-auth imports with AuthContext
 
-"use client";
-
-import { signOut, useSession } from "next-auth/react";
+import { useAuth } from "@/contexts/AuthContext";
 import { Bell, Wifi, WifiOff, LogOut, ChevronDown, AlertTriangle } from "lucide-react";
 import { useAlertStore } from "@/stores/alertStore";
 import { getRoleLabel, cn } from "@/lib/utils";
 import type { UserRole } from "@/types/api";
 import { useState } from "react";
-import { authApi } from "@/lib/api";
 
 interface TopBarProps {
   title: string;
 }
 
 export function TopBar({ title }: TopBarProps) {
-  const { data: session } = useSession();
+  const { session, logout } = useAuth();
   const { unreadCount, isConnected } = useAlertStore();
   const [menuOpen, setMenuOpen] = useState(false);
 
   const handleSignOut = async () => {
-    // Revoke refresh token on the backend before clearing session
-    if (session?.refreshToken) {
-      try {
-        await authApi.logout(session.refreshToken);
-      } catch {
-        // Proceed with sign-out even if revocation fails
-      }
-    }
-    await signOut({ callbackUrl: "/login" });
+    await logout();
   };
 
   return (
@@ -45,7 +35,7 @@ export function TopBar({ title }: TopBarProps) {
           <p className="text-xs text-severity-critical">
             Your session could not be renewed. Please{" "}
             <button
-              onClick={() => void signOut({ callbackUrl: "/login" })}
+              onClick={() => void logout()}
               className="underline hover:no-underline"
             >
               sign in again
