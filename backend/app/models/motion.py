@@ -26,7 +26,7 @@ class motion_event(Base):
     Django table: sv_motion_events  (note: custom table name set in Django Meta)
     """
 
-    __tablename__ = "sv_motion_events"
+    __tablename__ = "sv_motion_event"
 
     __table_args__ = (
         Index("ix_motion_camera_start", "camera_id", "motion_start"),
@@ -77,7 +77,7 @@ class MotionDetectionHealth(Base):
     Django table: sv_motiondetectionhealth
     """
 
-    __tablename__ = "sv_motiondetectionhealth"
+    __tablename__ = "sv_motiondetection_health"
 
     __table_args__ = (
         Index("ix_mdhealth_camera_active", "camera_id", "is_active"),

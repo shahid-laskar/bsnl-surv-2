@@ -212,7 +212,11 @@ export interface CameraHealth {
   mediamtx_ready: boolean;
   last_seen: string | null;
 }
-
+export interface StreamTypeMaster {
+         id: number;
+         strm_type: string;
+         remark: string | null;
+       }
 // ── Recording ─────────────────────────────────────────────────────────────────
 
 export interface VideoSegment {

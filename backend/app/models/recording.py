@@ -29,7 +29,7 @@ class VideoSegment(Base):
     Django table: sv_videosegment
     """
 
-    __tablename__ = "sv_videosegment"
+    __tablename__ = "sv_video_segment"
 
     __table_args__ = (
         Index("ix_videosegment_camera_start", "camera_id", "start_time"),

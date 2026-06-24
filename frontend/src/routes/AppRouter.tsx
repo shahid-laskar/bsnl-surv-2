@@ -9,6 +9,7 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { LoginPage } from "@/pages/LoginPage";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { CamerasPage } from "@/pages/CamerasPage";
+import { CameraAddPage } from "@/pages/CameraAddPage";
 import { CameraDetailPage } from "@/pages/CameraDetailPage";
 import { RecordingsPage } from "@/pages/RecordingsPage";
 import { MotionPage } from "@/pages/MotionPage";
@@ -56,7 +57,8 @@ export function AppRouter() {
         }
       >
         <Route index element={<DashboardPage />} />
-        <Route path="cameras" element={<CamerasPage />} />
+        <Route path="cameras" element={<CamerasPage />} />        
+        <Route path="cameras/add" element={<CameraAddPage />} />
         <Route path="cameras/:id" element={<CameraDetailPage />} />
         <Route path="recordings" element={<RecordingsPage />} />
         <Route path="motion" element={<MotionPage />} />

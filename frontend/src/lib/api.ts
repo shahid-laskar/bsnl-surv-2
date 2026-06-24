@@ -34,6 +34,7 @@ import type {
   UserCreateRequest,
   UserMe,
   VideoSegment,
+  StreamTypeMaster,
 } from "@/types/api";
 
 // ── Axios instance ────────────────────────────────────────────────────────────
@@ -174,18 +175,19 @@ export const cameraApi = {
 
 // ── Devices ───────────────────────────────────────────────────────────────────
 
-export const deviceApi = {
-  list: (params?: { staging_status?: string; page?: number; page_size?: number }) =>
-    api.get<PaginatedResponse<Device>>("/api/v1/devices", { params }),
-
+export const deviceApi = {  
+  list: (params?: { staging_status?: string }) =>
+         api.get<Device[]>("/api/v1/devices", { params }),
   get: (id: number) => api.get<Device>(`/api/v1/devices/${id}`),
-
+  streamTypes: () =>
+         api.get<StreamTypeMaster[]>("/api/v1/devices/stream-types"),
   updateHeartbeat: (deviceId: string, timestamp: string) =>
     api.post<{ success: boolean }>("/api/v1/devices/heartbeat", {
       device_id: deviceId,
       timestamp,
     }),
 };
+
 
 // ── Recordings ────────────────────────────────────────────────────────────────
 

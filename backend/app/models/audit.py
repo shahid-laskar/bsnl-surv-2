@@ -23,7 +23,7 @@ class ApiLog(Base):
     Django table: sv_apilog
     """
 
-    __tablename__ = "sv_apilog"
+    __tablename__ = "sv_api_log"
 
     __table_args__ = (
         Index("ix_apilog_timestamp", "timestamp"),
@@ -62,7 +62,7 @@ class ContainerStats(Base):
     Django table: sv_containerstats
     """
 
-    __tablename__ = "sv_containerstats"
+    __tablename__ = "sv_container_stats"
 
     __table_args__ = (Index("ix_containerstats_created_at", "created_at"),)
 

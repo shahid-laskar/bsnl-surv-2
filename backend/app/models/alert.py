@@ -26,7 +26,7 @@ class CameraStatusLog(Base):
     Django table: sv_camerastatuslog
     """
 
-    __tablename__ = "sv_camerastatuslog"
+    __tablename__ = "sv_camera_status_log"
 
     __table_args__ = (
         Index("ix_statuslog_camera_ts", "camera_id", "timestamp"),
@@ -61,7 +61,7 @@ class CameraHealth(Base):
     Django table: sv_camerahealth
     """
 
-    __tablename__ = "sv_camerahealth"
+    __tablename__ = "sv_camera_health"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     current_status: Mapped[str] = mapped_column(String(10), nullable=False)  # "up" | "down"
