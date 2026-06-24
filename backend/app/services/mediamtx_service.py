@@ -7,7 +7,7 @@ All calls are best-effort — a failure here must NOT roll back the DB transacti
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
-
+from urllib.parse import urlparse
 import httpx
 import structlog
 
@@ -28,6 +28,29 @@ class MediaMTXService:
     def __init__(self) -> None:
         self._base = settings.mediamtx_api_url.rstrip("/")
 
+    def _build_rtsp_source(cam: "camera_master") -> str:
+        if not cam.cam_strm1:
+            return ""
+
+        parsed = urlparse(cam.cam_strm1)
+
+        # URL already has credentials
+        if parsed.username:
+            return cam.cam_strm1
+
+        auth = ""
+        if cam.cam_usrname:
+            auth = f"{cam.cam_usrname}:{cam.cam_pass}@"
+
+        port = f":{parsed.port}" if parsed.port else ""
+
+        return (
+            f"{parsed.scheme}://"
+            f"{auth}"
+            f"{parsed.hostname}"
+            f"{port}"
+            f"{parsed.path}"
+        )
     def _build_path_config(self, cam: "camera_master") -> dict[str, Any]:
         """Build MediaMTX path config JSON for a camera."""
         strm_type = ""
@@ -35,7 +58,7 @@ class MediaMTXService:
             strm_type = cam.stream_type.strm_type.upper()
 
         if strm_type == "RTSP":
-            source = f"rtsp://{cam.cam_usrname}:{cam.cam_pass}@" f"{cam.cam_strm1.split('://')[-1]}"
+            source = self._build_rtsp_source(cam)
         elif strm_type in ("RTMP", "RTSP CLOUD"):
             source = "publisher"
         else:

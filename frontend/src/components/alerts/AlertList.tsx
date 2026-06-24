@@ -77,7 +77,6 @@ export function AlertList({ alerts }: AlertListProps) {
                 {alert.status === "down" ? "OFFLINE" : "ONLINE"}
               </span>
             </div>
-            <p className="mt-0.5 text-xs text-gray-500 truncate">{alert.cam_loc}</p>
             <p className="mt-1 text-[11px] text-gray-600">
               {formatDateTime(alert.timestamp)}
               {alert.duration && (

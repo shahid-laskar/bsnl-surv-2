@@ -48,14 +48,25 @@ export function DashboardPage() {
   const { data: camerasPage, isLoading: camerasLoading } = useQuery({
     queryKey: ["cameras", "dashboard"],
     queryFn: () =>
-      cameraApi.list({ is_active: true, page_size: 16 }).then((r) => r.data),
+      cameraApi.listAll({ is_active: true, page_size: 16 }).then((r) => r.data),
     refetchInterval: 30_000,
   });
 
-  const cameras = camerasPage?.items ?? [];
-  const onlineCount = stats?.active_cameras.length ?? 0;
-  const totalCount = stats?.all_added_streams ?? 0;
-  const offlineCount = totalCount - onlineCount;
+  const { data: statusesData } = useQuery({
+    queryKey: ["camera-statuses"],
+    queryFn: () => dashboardApi.getCameraStatuses().then((r) => r.data),
+    refetchInterval: 30_000,
+  });
+
+  const rawCameras = camerasPage?.items ?? [];
+  const cameras = rawCameras.map((cam) => {
+    const status = statusesData?.find((s) => s.cam_id === cam.cam_id);
+    return { ...cam, is_online: status?.status === "up" };
+  });
+
+  const onlineCount = stats?.online_cameras ?? 0;
+  const totalCount = stats?.total_cameras ?? 0;
+  const offlineCount = stats?.offline_cameras ?? 0;
 
   return (
     <div className="flex h-full flex-col gap-5">
@@ -80,8 +91,8 @@ export function DashboardPage() {
           accent={offlineCount > 0 ? "offline" : "brand"}
         />
         <StatCard
-          label="Live viewers"
-          value={statsLoading ? "—" : (stats?.live_cameras.length ?? 0)}
+          label="Active Motion"
+          value={statsLoading ? "—" : (stats?.active_motion_events ?? 0)}
           icon={Video}
           accent="warning"
         />

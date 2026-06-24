@@ -14,21 +14,27 @@ export function MotionPage() {
   const { data: cameras } = useQuery({
     queryKey: ["cameras", "filter-list"],
     queryFn: () =>
-      cameraApi.list({ is_active: true, page_size: 100 }).then((r) => r.data.items),
+      cameraApi.listAll({ is_active: true, page_size: 100 }).then((r) => r.data.items),
   });
 
   const { data, isLoading } = useQuery({
     queryKey: ["motion-events", camId, dateStr, activeOnly, page],
-    queryFn: () =>
-      motionApi
-        .list({
-          cam_id: camId || undefined,
-          date: dateStr,
-          active_only: activeOnly || undefined,
+    queryFn: () => {
+      if (!camId) return Promise.resolve({ items: [], total: 0, pages: 1, page: 1, page_size: 50 });
+      const startDate = new Date(dateStr);
+      const endDate = new Date(dateStr);
+      endDate.setDate(endDate.getDate() + 1);
+      return motionApi
+        .list(camId, {
+          start: startDate.toISOString(),
+          end: endDate.toISOString(),
+          is_active: activeOnly || undefined,
           page,
           page_size: 50,
         })
-        .then((r) => r.data),
+        .then((r) => r.data);
+    },
+    enabled: !!camId,
   });
 
   const events = data?.items ?? [];
@@ -113,8 +119,8 @@ export function MotionPage() {
               {events.map((event) => (
                 <tr key={event.id} className="hover:bg-surface-elevated transition-colors">
                   <td className="px-4 py-3">
-                    <p className="font-medium text-gray-200">{event.cam_name}</p>
-                    <p className="font-mono text-[11px] text-gray-500">{event.cam_id}</p>
+                    <p className="font-medium text-gray-200">{cameras?.find(c => c.cam_id === camId)?.cam_name ?? camId}</p>
+                    <p className="font-mono text-[11px] text-gray-500">{camId}</p>
                   </td>
                   <td className="px-4 py-3 text-gray-300">
                     {formatDateTime(event.motion_start)}
@@ -123,7 +129,7 @@ export function MotionPage() {
                     {event.motion_end ? formatDateTime(event.motion_end) : "—"}
                   </td>
                   <td className="px-4 py-3 font-mono text-gray-400">
-                    {formatDuration(event.duration)}
+                    {event.duration_seconds ? formatDuration(event.duration_seconds) : "—"}
                   </td>
                   <td className="px-4 py-3">
                     {event.is_active ? (

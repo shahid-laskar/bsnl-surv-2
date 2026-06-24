@@ -207,9 +207,7 @@ class CustomerService:
         )
         cir_name = cir_res.scalar_one_or_none() or ""
 
-        ba_res = await self._db.execute(
-            select(ba_master.ba_name).where(ba_master.id == ba_id)
-        )
+        ba_res = await self._db.execute(select(ba_master.ba_name).where(ba_master.id == ba_id))
         ba_name = ba_res.scalar_one_or_none() or ""
 
         plan_res = await self._db.execute(
@@ -223,7 +221,9 @@ class CustomerService:
 
     async def _count_cameras(self, com_id: int) -> int:
         result = await self._db.execute(
-            select(func.count()).select_from(camera_master).where(
+            select(func.count())
+            .select_from(camera_master)
+            .where(
                 camera_master.com_id == com_id,
                 camera_master.is_active == True,  # noqa: E712
             )

@@ -5,7 +5,7 @@ import { recordingApi, cameraApi } from "@/lib/api";
 import { RecordingTable } from "@/components/recordings/RecordingTable";
 import { RecordingPlayer } from "@/components/recordings/RecordingPlayer";
 import { todayRange } from "@/lib/utils";
-import type { VideoSegment } from "@/types/api";
+import type { TimelineSegment, TimelineResponse } from "@/types/api";
 import { Loader2, Filter } from "lucide-react";
 
 export function RecordingsPage() {
@@ -14,29 +14,26 @@ export function RecordingsPage() {
   const [camId, setCamId] = useState("");
   const [start, setStart] = useState(defaultStart.slice(0, 16));
   const [end, setEnd] = useState(defaultEnd.slice(0, 16));
-  const [page, setPage] = useState(1);
-  const [playingSegment, setPlayingSegment] = useState<VideoSegment | null>(null);
+  const [playingSegment, setPlayingSegment] = useState<TimelineSegment | null>(null);
 
   const { data: cameras } = useQuery({
     queryKey: ["cameras", "filter-list"],
     queryFn: () =>
-      cameraApi.list({ is_active: true, page_size: 100 }).then((r) => r.data.items),
+      cameraApi.listAll({ is_active: true, page_size: 100 }).then((r) => r.data.items),
   });
 
   const { data, isLoading } = useQuery({
-    queryKey: ["recordings", camId, start, end, page],
-    queryFn: () =>
-      recordingApi
-        .list({
-          cam_id: camId || undefined,
-          start: new Date(start).toISOString(),
-          end: new Date(end).toISOString(),
-          page,
-          page_size: 25,
-        })
-        .then((r) => r.data),
-    enabled: !!start && !!end,
+    queryKey: ["recordings", camId, start, end],
+    queryFn: () => {
+      if (!camId) return Promise.resolve({ segments: [], segment_count: 0 } as unknown as TimelineResponse);
+      return recordingApi
+        .getTimeline(camId, new Date(start).toISOString(), new Date(end).toISOString())
+        .then((r) => r.data);
+    },
+    enabled: !!start && !!end && !!camId,
   });
+
+  const selectedCamName = cameras?.find(c => c.cam_id === camId)?.cam_name ?? camId;
 
   return (
     <div className="flex flex-col gap-5">
@@ -44,7 +41,7 @@ export function RecordingsPage() {
       <div>
         <h2 className="text-lg font-semibold text-gray-100">Recordings</h2>
         <p className="text-xs text-gray-500 mt-0.5">
-          {data?.total ?? 0} segments in selected range
+          {data?.segment_count ?? 0} segments in selected range
         </p>
       </div>
 
@@ -59,10 +56,10 @@ export function RecordingsPage() {
           <label className="text-[11px] text-gray-500">Camera</label>
           <select
             value={camId}
-            onChange={(e) => { setCamId(e.target.value); setPage(1); }}
+            onChange={(e) => { setCamId(e.target.value); }}
             className="rounded-md border border-surface-border bg-surface px-3 py-2 text-sm text-gray-100 focus:border-brand-700/50 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
           >
-            <option value="">All cameras</option>
+            <option value="" disabled>Select a camera</option>
             {(cameras ?? []).map((c) => (
               <option key={c.cam_id} value={c.cam_id}>
                 {c.cam_name} ({c.cam_id})
@@ -76,7 +73,7 @@ export function RecordingsPage() {
           <input
             type="datetime-local"
             value={start}
-            onChange={(e) => { setStart(e.target.value); setPage(1); }}
+            onChange={(e) => { setStart(e.target.value); }}
             className="rounded-md border border-surface-border bg-surface px-3 py-2 text-sm text-gray-100 focus:border-brand-700/50 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
           />
         </div>
@@ -86,7 +83,7 @@ export function RecordingsPage() {
           <input
             type="datetime-local"
             value={end}
-            onChange={(e) => { setEnd(e.target.value); setPage(1); }}
+            onChange={(e) => { setEnd(e.target.value); }}
             className="rounded-md border border-surface-border bg-surface px-3 py-2 text-sm text-gray-100 focus:border-brand-700/50 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
           />
         </div>
@@ -99,31 +96,16 @@ export function RecordingsPage() {
         </div>
       ) : (
         <>
-          <RecordingTable
-            segments={data?.items ?? []}
-            onSegmentClick={setPlayingSegment}
-          />
-
-          {/* Pagination */}
-          {(data?.pages ?? 1) > 1 && (
-            <div className="flex items-center justify-center gap-2">
-              <button
-                disabled={page === 1}
-                onClick={() => setPage(page - 1)}
-                className="rounded-md border border-surface-border px-3 py-1.5 text-xs text-gray-400 hover:bg-surface-elevated disabled:opacity-40 transition-colors"
-              >
-                Previous
-              </button>
-              <span className="text-xs text-gray-500">
-                Page {page} of {data?.pages}
-              </span>
-              <button
-                disabled={page === (data?.pages ?? 1)}
-                onClick={() => setPage(page + 1)}
-                className="rounded-md border border-surface-border px-3 py-1.5 text-xs text-gray-400 hover:bg-surface-elevated disabled:opacity-40 transition-colors"
-              >
-                Next
-              </button>
+          {camId ? (
+            <RecordingTable
+              segments={data?.segments ?? []}
+              onSegmentClick={setPlayingSegment}
+              camId={camId}
+              camName={selectedCamName}
+            />
+          ) : (
+            <div className="flex items-center justify-center py-20">
+              <p className="text-sm text-gray-500">Please select a camera to view recordings.</p>
             </div>
           )}
         </>
@@ -133,6 +115,7 @@ export function RecordingsPage() {
       {playingSegment && (
         <RecordingPlayer
           segment={playingSegment}
+          camName={selectedCamName}
           onClose={() => setPlayingSegment(null)}
         />
       )}

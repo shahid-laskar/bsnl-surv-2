@@ -28,7 +28,7 @@ export function CameraCard({ camera }: CameraCardProps) {
             <p className="font-mono text-[11px] text-gray-500">{camera.cam_id}</p>
           </div>
         </div>
-        <CameraStatusBadge isOnline={camera.is_online} showLabel={false} />
+        <CameraStatusBadge isOnline={!!camera.is_online} showLabel={false} />
       </div>
 
       {/* Details */}
@@ -39,7 +39,7 @@ export function CameraCard({ camera }: CameraCardProps) {
         </div>
         <div className="flex items-center gap-2 text-xs text-gray-500">
           <Video className="h-3.5 w-3.5 shrink-0" />
-          <span className="truncate">{camera.strm_type}</span>
+          <span className="truncate">Stream ID: {camera.strm_type_id ?? 'Unknown'}</span>
         </div>
         {camera.motion_active && (
           <div className="flex items-center gap-2 text-xs text-brand-400">

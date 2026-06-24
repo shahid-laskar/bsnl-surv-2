@@ -93,7 +93,7 @@ class camera_master(Base):
     )
     device: Mapped["device_master"] = relationship("device_master", back_populates="cameras")
     stream_type: Mapped["stream_master | None"] = relationship(
-        "stream_master", back_populates="cameras"
+        "stream_master", back_populates="cameras", lazy="selectin"
     )
     segments: Mapped[list["VideoSegment"]] = relationship("VideoSegment", back_populates="camera")
     motion_events: Mapped[list["motion_event"]] = relationship(

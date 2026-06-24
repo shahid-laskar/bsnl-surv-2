@@ -70,7 +70,7 @@ export function CameraGrid({ cameras }: CameraGridProps) {
             <CameraPlayer
               camId={camera.cam_id}
               camName={camera.cam_name}
-              isOnline={camera.is_online}
+              isOnline={!!camera.is_online}
             />
           </div>
         ))}
@@ -112,7 +112,7 @@ export function CameraGrid({ cameras }: CameraGridProps) {
             <CameraPlayer
               camId={selectedCamera.cam_id}
               camName={selectedCamera.cam_name}
-              isOnline={selectedCamera.is_online}
+              isOnline={!!selectedCamera.is_online}
               fullscreen
             />
           </div>

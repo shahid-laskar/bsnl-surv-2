@@ -4,9 +4,11 @@ import { useQuery } from "@tanstack/react-query";
 import { customerApi } from "@/lib/api";
 import { Building2, Plus, Loader2 } from "lucide-react";
 import { RoleGuard } from "@/components/layout/RoleGuard";
+import { AddCustomerModal } from "@/components/customers/AddCustomerModal";
 
 export function CustomersPage() {
   const [page, setPage] = useState(1);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ["customers", page],
@@ -33,7 +35,10 @@ export function CustomersPage() {
             </p>
           </div>
           <RoleGuard roles={["sysadmin", "circle_admin", "ba_admin"]}>
-            <button className="flex items-center gap-2 rounded-lg bg-brand-700 px-3 py-2 text-sm font-medium text-white hover:bg-brand-600 transition-colors">
+            <button 
+              onClick={() => setIsAddModalOpen(true)}
+              className="flex items-center gap-2 rounded-lg bg-brand-700 px-3 py-2 text-sm font-medium text-white hover:bg-brand-600 transition-colors"
+            >
               <Plus className="h-4 w-4" />
               Add Customer
             </button>
@@ -122,6 +127,10 @@ export function CustomersPage() {
           </div>
         )}
       </div>
+
+      {isAddModalOpen && (
+        <AddCustomerModal onClose={() => setIsAddModalOpen(false)} />
+      )}
     </RoleGuard>
   );
 }

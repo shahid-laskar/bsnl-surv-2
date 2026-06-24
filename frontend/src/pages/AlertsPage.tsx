@@ -6,17 +6,15 @@ import { AlertList } from "@/components/alerts/AlertList";
 import { Loader2 } from "lucide-react";
 
 export function AlertsPage() {
-  const [statusFilter, setStatusFilter] = useState<"" | "up" | "down">("");
   const [page, setPage] = useState(1);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["alerts", statusFilter, page],
+    queryKey: ["alerts", page],
     queryFn: () =>
       alertApi
         .list({
-          status: statusFilter || undefined,
-          page,
-          page_size: 50,
+          skip: (page - 1) * 50,
+          limit: 50,
         })
         .then((r) => r.data),
     refetchInterval: 15_000,
@@ -32,28 +30,6 @@ export function AlertsPage() {
           </p>
         </div>
 
-        {/* Filter tabs */}
-        <div className="flex items-center gap-1 rounded-lg border border-surface-border bg-surface-elevated p-1">
-          {(
-            [
-              { value: "", label: "All" },
-              { value: "down", label: "Offline" },
-              { value: "up", label: "Online" },
-            ] as const
-          ).map((tab) => (
-            <button
-              key={tab.value}
-              onClick={() => { setStatusFilter(tab.value); setPage(1); }}
-              className={`rounded px-3 py-1 text-xs font-medium transition-colors ${
-                statusFilter === tab.value
-                  ? "bg-brand-700 text-white"
-                  : "text-gray-400 hover:text-gray-200"
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
       </div>
 
       {/* List */}
@@ -68,7 +44,7 @@ export function AlertsPage() {
       </div>
 
       {/* Pagination */}
-      {(data?.pages ?? 1) > 1 && (
+      {Math.ceil((data?.total ?? 0) / 50) > 1 && (
         <div className="flex items-center justify-center gap-2">
           <button
             disabled={page === 1}
@@ -78,10 +54,10 @@ export function AlertsPage() {
             Previous
           </button>
           <span className="text-xs text-gray-500">
-            Page {page} of {data?.pages}
+            Page {page} of {Math.ceil((data?.total ?? 0) / 50)}
           </span>
           <button
-            disabled={page === (data?.pages ?? 1)}
+            disabled={page === Math.ceil((data?.total ?? 0) / 50)}
             onClick={() => setPage(page + 1)}
             className="rounded-md border border-surface-border px-3 py-1.5 text-xs text-gray-400 hover:bg-surface-elevated disabled:opacity-40"
           >

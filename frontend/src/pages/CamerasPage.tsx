@@ -1,7 +1,7 @@
 // src/pages/CamerasPage.tsx
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { cameraApi } from "@/lib/api";
+import { cameraApi, dashboardApi } from "@/lib/api";
 import { CameraCard } from "@/components/cameras/CameraCard";
 import { RoleGuard } from "@/components/layout/RoleGuard";
 import { Plus, Search, Loader2, Camera } from "lucide-react";
@@ -14,14 +14,25 @@ export function CamerasPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["cameras", page],
     queryFn: () =>
-      cameraApi.list({ is_active: true, page, page_size: 24 }).then((r) => r.data),
+      cameraApi.listAll({ is_active: true, page, page_size: 24 }).then((r) => r.data),
   });
 
-  const cameras = data?.items ?? [];
+  const { data: statusesData } = useQuery({
+    queryKey: ["camera-statuses"],
+    queryFn: () => dashboardApi.getCameraStatuses().then((r) => r.data),
+    refetchInterval: 30_000,
+  });
+
+  const rawCameras = data?.items ?? [];
+  const cameras = rawCameras.map((cam) => {
+    const status = statusesData?.find((s) => s.cam_id === cam.cam_id);
+    return { ...cam, is_online: status?.status === "up" };
+  });
+
   const filtered = cameras.filter(
     (c) =>
       c.cam_name.toLowerCase().includes(search.toLowerCase()) ||
-      c.cam_id.toLowerCase().includes(search.toLowerCase()) ||
+      (c.cam_id && c.cam_id.toLowerCase().includes(search.toLowerCase())) ||
       c.cam_loc.toLowerCase().includes(search.toLowerCase()),
   );
 

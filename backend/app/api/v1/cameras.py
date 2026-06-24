@@ -31,7 +31,7 @@ router = APIRouter(prefix="/cameras", tags=["cameras"])
 
 @router.get("", response_model=PaginatedResponse[CameraListItem], summary="List cameras")
 async def list_cameras(
-    com_id: int = Query(..., description="Filter by customer/company ID"),
+    com_id: int | None = Query(default=None, description="Filter by customer/company ID"),
     is_active: bool | None = Query(default=None),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=25, ge=1, le=200),
@@ -39,10 +39,13 @@ async def list_cameras(
     db: AsyncSession = Depends(get_db),
 ) -> PaginatedResponse[CameraListItem]:
     """
-    List cameras for a company.
+    List cameras for a company or all companies.
     Users can only see cameras belonging to their own company (or all, for sysadmin).
     """
-    _assert_customer_access(current_user, com_id)
+    if com_id is not None:
+        _assert_customer_access(current_user, com_id)
+    elif current_user.role not in ("sysadmin", "circle_admin", "ba_admin"):
+        com_id = current_user.com_id
 
     params = PaginationParams(page=page, page_size=page_size)
     service = CameraService(db)

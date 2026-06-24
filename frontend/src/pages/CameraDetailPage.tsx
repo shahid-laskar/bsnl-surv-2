@@ -17,11 +17,11 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { todayRange } from "@/lib/utils";
-import type { VideoSegment } from "@/types/api";
+import type { TimelineSegment } from "@/types/api";
 
 export function CameraDetailPage() {
   const { id: camId } = useParams<{ id: string }>();
-  const [playingSegment, setPlayingSegment] = useState<VideoSegment | null>(null);
+  const [playingSegment, setPlayingSegment] = useState<TimelineSegment | null>(null);
 
   const { start, end } = todayRange();
 
@@ -36,7 +36,7 @@ export function CameraDetailPage() {
     queryKey: ["recordings", camId, start, end],
     queryFn: () =>
       recordingApi
-        .list({ cam_id: camId, start, end, page_size: 50 })
+        .getTimeline(camId!, new Date(start).toISOString(), new Date(end).toISOString())
         .then((r) => r.data),
     enabled: !!camera,
   });
@@ -77,7 +77,7 @@ export function CameraDetailPage() {
         <div>
           <div className="flex items-center gap-2">
             <h2 className="text-lg font-semibold text-gray-100">{camera.cam_name}</h2>
-            <CameraStatusBadge isOnline={camera.is_online} />
+            <CameraStatusBadge isOnline={!!camera.is_online} />
           </div>
           <p className="font-mono text-xs text-gray-500 mt-0.5">{camera.cam_id}</p>
         </div>
@@ -88,7 +88,7 @@ export function CameraDetailPage() {
           </div>
           <div className="flex items-center gap-1.5">
             <Video className="h-3.5 w-3.5" />
-            {camera.strm_type} · {camera.cam_make}
+            Stream ID: {camera.strm_type_id ?? 'Unknown'} · {camera.cam_make}
           </div>
           {camera.motion_active && (
             <div className="flex items-center gap-1.5 text-brand-400">
@@ -104,7 +104,7 @@ export function CameraDetailPage() {
         <CameraPlayer
           camId={camera.cam_id}
           camName={camera.cam_name}
-          isOnline={camera.is_online}
+          isOnline={!!camera.is_online}
         />
       </div>
 
@@ -120,7 +120,9 @@ export function CameraDetailPage() {
           </div>
         ) : (
           <RecordingTable
-            segments={recordings?.items ?? []}
+            segments={recordings?.segments ?? []}
+            camId={camera.cam_id}
+            camName={camera.cam_name}
             onSegmentClick={setPlayingSegment}
           />
         )}
@@ -130,6 +132,7 @@ export function CameraDetailPage() {
       {playingSegment && (
         <RecordingPlayer
           segment={playingSegment}
+          camName={camera.cam_name}
           onClose={() => setPlayingSegment(null)}
         />
       )}

@@ -51,13 +51,15 @@ class CameraService:
 
     async def list_for_customer(
         self,
-        com_id: int,
+        com_id: int | None = None,
         is_active: bool | None = None,
         offset: int = 0,
         limit: int = 25,
     ) -> tuple[list[camera_master], int]:
-        """Return (cameras, total_count) for a customer, with optional active filter."""
-        q = select(camera_master).where(camera_master.com_id == com_id)
+        """Return (cameras, total_count) for a customer (or all customers if com_id is None), with optional active filter."""
+        q = select(camera_master)
+        if com_id is not None:
+            q = q.where(camera_master.com_id == com_id)
         if is_active is not None:
             q = q.where(camera_master.is_active == is_active)
 
@@ -111,6 +113,12 @@ class CameraService:
             added_by=added_by_id,
             strm_type_id=data.strm_type_id,
         )
+
+        if data.strm_type_id:
+            from app.models.device import stream_master
+            strm_result = await self._db.execute(select(stream_master).where(stream_master.id == data.strm_type_id))
+            cam.stream_type = strm_result.scalar_one_or_none()
+
         self._db.add(cam)
         await self._db.flush()  # Get PK without committing transaction
 

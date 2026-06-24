@@ -58,9 +58,7 @@ class UserService:
         return result.scalar_one_or_none() is not None
 
     async def _get_customer(self, com_id: int) -> customer_master | None:
-        result = await self._db.execute(
-            select(customer_master).where(customer_master.id == com_id)
-        )
+        result = await self._db.execute(select(customer_master).where(customer_master.id == com_id))
         return result.scalar_one_or_none()
 
     async def _assert_customer_exists(self, com_id: int) -> customer_master:
@@ -103,7 +101,9 @@ class UserService:
                 raise BadRequestError("circle_admin must not be associated with a customer company")
         elif role == "ba_admin":
             if not cir_id or not ba_id:
-                raise BadRequestError("ba_admin role requires both cir_id and ba_id to be specified")
+                raise BadRequestError(
+                    "ba_admin role requires both cir_id and ba_id to be specified"
+                )
             if com_id:
                 raise BadRequestError("ba_admin must not be associated with a customer company")
         # sysadmin: no constraints
@@ -167,7 +167,11 @@ class UserService:
                 raise ForbiddenError("circle_admin cannot update sysadmin or circle_admin users")
             if target.cir_id != updater.cir_id:
                 raise ForbiddenError("circle_admin can only update users in their own circle")
-            if request.role is not None and request.role not in ("ba_admin", "cust_admin", "viewer"):
+            if request.role is not None and request.role not in (
+                "ba_admin",
+                "cust_admin",
+                "viewer",
+            ):
                 raise ForbiddenError("Invalid target role for circle_admin")
             if request.cir_id is not None and request.cir_id != updater.cir_id:
                 raise ForbiddenError("Cannot assign user outside of your circle")

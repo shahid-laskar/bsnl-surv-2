@@ -5,14 +5,16 @@ import { userApi } from "@/lib/api";
 import { getRoleLabel, formatDate, cn } from "@/lib/utils";
 import { Users, Plus, Loader2, UserX, CheckCircle } from "lucide-react";
 import { RoleGuard } from "@/components/layout/RoleGuard";
+import { AddUserModal } from "@/components/users/AddUserModal";
 
 export function UsersPage() {
   const [page, setPage] = useState(1);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const queryClient = useQueryClient();
 
   const { data, isLoading } = useQuery({
-    queryKey: ["users", page],
-    queryFn: () => userApi.list({ page, page_size: 25 }).then((r) => r.data),
+    queryKey: ["users"],
+    queryFn: () => userApi.list().then((r) => r.data),
   });
 
   const deactivateMutation = useMutation({
@@ -20,7 +22,10 @@ export function UsersPage() {
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["users"] }),
   });
 
-  const users = data?.items ?? [];
+  const allUsers = data ?? [];
+  const totalItems = allUsers.length;
+  const totalPages = Math.ceil(totalItems / 25);
+  const users = allUsers.slice((page - 1) * 25, page * 25);
 
   return (
     <RoleGuard
@@ -36,11 +41,14 @@ export function UsersPage() {
           <div>
             <h2 className="text-lg font-semibold text-gray-100">Users</h2>
             <p className="text-xs text-gray-500 mt-0.5">
-              {data?.total ?? 0} users registered
+              {totalItems} users registered
             </p>
           </div>
           <RoleGuard roles={["sysadmin", "circle_admin", "ba_admin", "cust_admin"]}>
-            <button className="flex items-center gap-2 rounded-lg bg-brand-700 px-3 py-2 text-sm font-medium text-white hover:bg-brand-600 transition-colors">
+            <button 
+              onClick={() => setIsAddModalOpen(true)}
+              className="flex items-center gap-2 rounded-lg bg-brand-700 px-3 py-2 text-sm font-medium text-white hover:bg-brand-600 transition-colors"
+            >
               <Plus className="h-4 w-4" />
               Add User
             </button>
@@ -126,7 +134,7 @@ export function UsersPage() {
         )}
 
         {/* Pagination */}
-        {(data?.pages ?? 1) > 1 && (
+        {totalPages > 1 && (
           <div className="flex items-center justify-center gap-2">
             <button
               disabled={page === 1}
@@ -136,10 +144,10 @@ export function UsersPage() {
               Previous
             </button>
             <span className="text-xs text-gray-500">
-              Page {page} of {data?.pages}
+              Page {page} of {totalPages}
             </span>
             <button
-              disabled={page === (data?.pages ?? 1)}
+              disabled={page === totalPages}
               onClick={() => setPage(page + 1)}
               className="rounded-md border border-surface-border px-3 py-1.5 text-xs text-gray-400 hover:bg-surface-elevated disabled:opacity-40"
             >
@@ -148,6 +156,10 @@ export function UsersPage() {
           </div>
         )}
       </div>
+
+      {isAddModalOpen && (
+        <AddUserModal onClose={() => setIsAddModalOpen(false)} />
+      )}
     </RoleGuard>
   );
 }

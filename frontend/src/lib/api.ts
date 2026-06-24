@@ -49,7 +49,6 @@ import type {
   TokenRefreshResponse,
   UserCreateRequest,
   UserMe,
-  VideoSegment,
 } from "@/types/api";
 
 // ── Axios instance ────────────────────────────────────────────────────────────
