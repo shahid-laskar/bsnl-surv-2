@@ -4,6 +4,10 @@ Camera CRUD endpoints.
 
 All write operations require sysadmin or circle_admin.
 Read operations allow any authenticated user, scoped to their company.
+
+Fix: removed the duplicate GET /{cam_id}/stream-token that was shadowing
+streams.py and causing a 500 (wrong response field name).  Stream tokens
+are now exclusively issued by streams.py via StreamService.
 """
 
 from fastapi import APIRouter, Depends, Query
@@ -12,18 +16,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.dependencies import CurrentUser, get_current_user, require_role
 from app.core.exceptions import ForbiddenError
-from app.core.security import create_stream_token
 from app.models.auth import SvUser
 from app.schemas.camera import (
     CameraCreateRequest,
     CameraListItem,
     CameraResponse,
     CameraUpdateRequest,
-    StreamTokenResponse,
 )
 from app.schemas.common import MessageResponse, PaginatedResponse, PaginationParams
 from app.services.camera_service import CameraService
-from app.core.config import settings
 
 router = APIRouter(prefix="/cameras", tags=["cameras"])
 
@@ -136,36 +137,6 @@ async def reactivate_camera(
 
 
 @router.get(
-    "/{cam_id}/stream-token",
-    response_model=StreamTokenResponse,
-    summary="Get a short-lived HLS stream token",
-)
-async def get_stream_token(
-    cam_id: str,
-    current_user: CurrentUser = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-) -> StreamTokenResponse:
-    """
-    Generate a short-lived JWT (15 min) for HLS stream access.
-    The stream URL embeds the token as a query parameter, which Nginx
-    validates via auth_request before proxying segments from MediaMTX.
-    """
-    service = CameraService(db)
-    cam = await service.get_by_cam_id(cam_id)
-    _assert_customer_access(current_user, cam.com_id)
-
-    token = create_stream_token(cam_id=cam_id, user_id=current_user.id)
-    stream_url = f"http://{settings.domain_name}/stream/hls/{cam_id}/index.m3u8?token={token}"
-
-    return StreamTokenResponse(
-        cam_id=cam_id,
-        stream_url=stream_url,
-        token=token,
-        expires_in=settings.jwt_stream_token_expire_minutes * 60,
-    )
-
-
-@router.get(
     "/{cam_id}/status",
     summary="Get live stream status from MediaMTX",
 )
@@ -193,6 +164,13 @@ async def get_camera_status(
         "readers": len(path_info.get("readers", [])),
         "source": path_info.get("source"),
     }
+
+
+# ── NOTE ──────────────────────────────────────────────────────────────────────
+# GET /{cam_id}/stream-token is intentionally NOT defined here.
+# It lives exclusively in app/api/v1/streams.py (StreamService) so that only
+# one handler owns the route and the response schema is always correct.
+# ─────────────────────────────────────────────────────────────────────────────
 
 
 # ── Scope enforcement helper ──────────────────────────────────────────────────

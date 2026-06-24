@@ -3,8 +3,12 @@ app/api/v1/customers.py
 Customer (tenant/company) CRUD endpoints, plus a read-only plans lookup.
 
 Write operations require sysadmin, circle_admin, or ba_admin — scoped to
-their own circle/BA (enforced in CustomerService). Read operations are
-scoped per role in the service layer, same pattern as UserService.
+their own circle/BA (enforced in CustomerService).  Read operations are
+scoped per role in the service layer.
+
+All list / detail responses now include joined names (cir_name, ba_name,
+plan_name) and camera_count / camera_limit so the frontend table can
+render without extra API calls.
 """
 
 from fastapi import APIRouter, Depends, Query
@@ -26,8 +30,7 @@ from app.services.customer_service import CustomerService
 
 router = APIRouter(prefix="/customers", tags=["customers"])
 
-# Separate, unprefixed router for plan lookups — plans aren't a sub-resource
-# of a single customer, they're shared reference data used when creating one.
+# Plans are shared reference data, not a sub-resource of a single customer.
 plans_router = APIRouter(prefix="/plans", tags=["plans"])
 
 
@@ -39,13 +42,12 @@ async def list_customers(
     current_user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> PaginatedResponse[CustomerListItem]:
-    """List customers, scoped to the caller's role (circle/BA/own company)."""
+    """List customers scoped to the caller's role (circle/BA/own company)."""
     params = PaginationParams(page=page, page_size=page_size)
     service = CustomerService(db)
-    customers, total = await service.list_for_user(
+    items, total = await service.list_for_user(
         current_user, ba_id=ba_id, offset=params.offset, limit=params.page_size
     )
-    items = [CustomerListItem.model_validate(c) for c in customers]
     return PaginatedResponse(items=items, total=total, page=page, page_size=page_size)
 
 
@@ -64,10 +66,10 @@ async def create_customer(
     """
     Register a new customer/company under a circle + BA + subscription plan.
     circle_admin/ba_admin are restricted to their own circle/BA by the service layer.
+    Returns the full enriched response including circle/BA/plan names.
     """
     service = CustomerService(db)
-    customer = await service.create(body, created_by=current_user)
-    return CustomerResponse.model_validate(customer)
+    return await service.create(body, created_by=current_user)
 
 
 @router.get("/{customer_id}", response_model=CustomerResponse, summary="Get customer")
@@ -77,9 +79,11 @@ async def get_customer(
     db: AsyncSession = Depends(get_db),
 ) -> CustomerResponse:
     service = CustomerService(db)
-    customer = await service.get_by_id(customer_id)
-    service.assert_view_permission(current_user, customer)
-    return CustomerResponse.model_validate(customer)
+    # Permission check uses the ORM object (lightweight)
+    customer_orm = await service.get_by_id(customer_id)
+    service.assert_view_permission(current_user, customer_orm)
+    # Return the enriched response
+    return await service.get_response(customer_id)
 
 
 @router.patch(
@@ -96,8 +100,7 @@ async def update_customer(
 ) -> CustomerResponse:
     """Partial update. cir_id/ba_id are immutable via this endpoint."""
     service = CustomerService(db)
-    customer = await service.update(customer_id, body, updated_by=current_user)
-    return CustomerResponse.model_validate(customer)
+    return await service.update(customer_id, body, updated_by=current_user)
 
 
 # ── Plans lookup ───────────────────────────────────────────────────────────────
